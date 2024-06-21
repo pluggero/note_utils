@@ -75,6 +75,13 @@ def parse_users_net_user_domain(command_output):
     return user_names
 
 
+def print_usernames(user_names, domain):
+    if domain:
+        user_names = [f"{domain}\\{user}" for user in user_names]
+    for user in user_names:
+        print(user)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
@@ -95,6 +102,11 @@ def main():
         "file_path",
         help="Path to the Markdown file containing the command output.",
     )
+    parser.add_argument(
+        "--add-domain",
+        help="Domain name to prepend to the usernames.",
+        default=None,
+    )
 
     args = parser.parse_args()
 
@@ -111,18 +123,15 @@ def main():
     if command_output:
         if args.command == "get-localuser":
             user_names = parse_users_get_localuser(command_output)
-            for user in user_names:
-                print(user)
         elif args.command == "net user":
             user_names = parse_users_net_user(command_output)
-            for user in user_names:
-                print(user)
         elif args.command == "net user /domain":
             user_names = parse_users_net_user_domain(command_output)
-            for user in user_names:
-                print(user)
         else:
             print(f"Parsing logic for {args.command} is not implemented yet.")
+            return
+
+        print_usernames(user_names, args.add_domain)
 
 
 if __name__ == "__main__":
