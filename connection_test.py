@@ -4,13 +4,21 @@ import argparse
 import os
 import subprocess
 import sys
+from datetime import datetime
 
 import nmap
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+
+console = Console()
 
 
 def check_sudo():
     if os.geteuid() != 0:
-        print("This script must be run with sudo privileges.")
+        console.print(
+            "[bold red]This script must be run with sudo privileges.[/bold red]"
+        )
         sys.exit(1)
 
 
@@ -28,12 +36,12 @@ def parse_arguments():
     parser.add_argument(
         "--verbose", action="store_true", help="Display detailed information"
     )
-    return parser
+    return parser.parse_args()
 
 
 def read_hosts_from_stdin(verbose):
     if verbose:
-        print(
+        console.print(
             "Reading hosts from stdin. Press Ctrl+D (or Ctrl+Z on Windows) to end input."
         )
     return [line.strip() for line in sys.stdin if line.strip()]
@@ -43,56 +51,76 @@ def perform_ping_sweep(nm, hosts, verbose=False):
     up_hosts = []
     down_hosts = []
 
-    if verbose:
-        print("\nPerforming ping sweep...")
-    for host in hosts:
-        if verbose:
-            print(f"Pinging {host}...")
-        try:
-            nm.scan(host, arguments="-sn")
-            if nm.all_hosts():
-                if verbose:
-                    print(f"{host} is up.")
-                up_hosts.append(host)
-            else:
-                if verbose:
-                    print(f"{host} is down.")
-                down_hosts.append(host)
-        except Exception as e:
+    with Progress(
+        SpinnerColumn(),
+        BarColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("[blue]Performing ping sweep...", total=len(hosts))
+
+        for host in hosts:
             if verbose:
-                print(f"Error scanning {host}: {e}")
-            down_hosts.append(host)
+                console.print(f"Pinging {host}...")
+            try:
+                nm.scan(host, arguments="-sn")
+                if nm.all_hosts():
+                    if verbose:
+                        console.print(f"[green]{host} is up.[/green]")
+                    up_hosts.append(host)
+                else:
+                    if verbose:
+                        console.print(f"[red]{host} is down.[/red]")
+                    down_hosts.append(host)
+            except Exception as e:
+                if verbose:
+                    console.print(f"[red]Error scanning {host}: {e}[/red]")
+                down_hosts.append(host)
+            progress.advance(task)
 
     return up_hosts, down_hosts
 
 
-def perform_sudo_port_scan(host, verbose=False):
-    try:
-        if verbose:
-            print(f"Scanning top 1000 ports on {host} with sudo nmap -Pn...")
-        result = subprocess.run(
-            ["sudo", "nmap", "-Pn", "--top-ports", "1000", host],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        open_ports = []
-        for line in result.stdout.splitlines():
-            if "/tcp" in line and "open" in line:
-                port = line.split("/")[0]
-                open_ports.append(port)
-        return open_ports
-    except subprocess.CalledProcessError as e:
-        if verbose:
-            print(f"Error scanning ports on {host}: {e}")
-        return []
+def perform_sudo_port_scan(hosts, verbose=False):
+    up_hosts = []
+    with Progress(
+        SpinnerColumn(),
+        BarColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("[blue]Performing port scan...", total=len(hosts))
+
+        for host in hosts:
+            try:
+                if verbose:
+                    console.print(
+                        f"Scanning top 1000 ports on {host} with sudo nmap -Pn..."
+                    )
+                result = subprocess.run(
+                    ["sudo", "nmap", "-Pn", "--top-ports", "1000", host],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                open_ports = []
+                for line in result.stdout.splitlines():
+                    if "/tcp" in line and "open" in line:
+                        port = line.split("/")[0]
+                        open_ports.append(port)
+                if open_ports:
+                    up_hosts.append(host)
+            except subprocess.CalledProcessError as e:
+                if verbose:
+                    console.print(f"[red]Error scanning ports on {host}: {e}[/red]")
+            progress.advance(task)
+
+    return up_hosts
 
 
 def main():
     check_sudo()
-
-    parser = parse_arguments()
-    args = parser.parse_args()
+    args = parse_arguments()
 
     if args.file:
         hosts = [line.strip() for line in args.file if line.strip()]
@@ -102,28 +130,65 @@ def main():
         hosts = read_hosts_from_stdin(args.verbose)
 
     if not hosts:
-        parser.print_help()
+        console.print("[bold red]No hosts specified.[/bold red]")
         sys.exit(1)
+
+    total_hosts = len(hosts)
+
+    start_time_connection_test = datetime.now()
+    console.print(
+        f"[bold cyan]Starting Connection Test at {start_time_connection_test.strftime('%Y-%m-%d %H:%M')}[/bold cyan]"
+    )
+
+    start_time_ping_sweep = datetime.now()
+    console.print(
+        f"[bold yellow]Stage 1 - Starting Ping Sweep at {start_time_ping_sweep.strftime('%Y-%m-%d %H:%M')}[/bold yellow]"
+    )
 
     nm = nmap.PortScanner()
     up_hosts, down_hosts = perform_ping_sweep(nm, hosts, args.verbose)
 
-    confirmed_up_hosts = []
+    end_time_ping_sweep = datetime.now()
+    duration_ping_sweep = (end_time_ping_sweep - start_time_ping_sweep).total_seconds()
+
+    console.print(
+        f"[bold yellow]Stage 1 - Ping sweep done: {total_hosts} hosts ({len(up_hosts)} hosts up) scanned in {duration_ping_sweep:.2f} seconds[/bold yellow]"
+    )
+
     if down_hosts:
-        for host in down_hosts:
-            open_ports = perform_sudo_port_scan(host, args.verbose)
-            if open_ports:
-                confirmed_up_hosts.append(host)
+        start_time_port_scan = datetime.now()
+        console.print(
+            f"[bold magenta]Stage 2 - Starting Port Scan on unreachable hosts at {start_time_port_scan.strftime('%Y-%m-%d %H:%M')}[/bold magenta]"
+        )
 
-    all_up_hosts = up_hosts + confirmed_up_hosts
+        newly_up_hosts = perform_sudo_port_scan(down_hosts, args.verbose)
+        up_hosts.extend(newly_up_hosts)
 
-    print("\nHosts that are online:")
-    for host in all_up_hosts:
-        print(host)
+        end_time_port_scan = datetime.now()
+        duration_port_scan = (end_time_port_scan - start_time_port_scan).total_seconds()
 
-    print("\nHosts that are not online:")
-    for host in set(hosts) - set(all_up_hosts):
-        print(host)
+        console.print(
+            f"[bold magenta]Stage 2 - Port Scan done: {total_hosts} hosts ({len(up_hosts)} hosts up) scanned in {duration_port_scan:.2f} seconds[/bold magenta]"
+        )
+
+    end_time_connection_test = datetime.now()
+    duration_connection_test = (
+        end_time_connection_test - start_time_connection_test
+    ).total_seconds()
+
+    console.print(
+        f"[bold cyan]Connection Test done: {total_hosts} hosts ({len(up_hosts)} hosts up) scanned in {duration_connection_test:.2f} seconds[/bold cyan]"
+    )
+
+    table_lines = ["| Host | Reachable |", "|------|-----------|"]
+
+    for host in hosts:
+        status = "Yes" if host in up_hosts else "No"
+        table_lines.append(f"| {host} | {status} |")
+
+    md_output = "\n".join(table_lines)
+
+    console.print(f"\n{md_output}")
 
 
 if __name__ == "__main__":
