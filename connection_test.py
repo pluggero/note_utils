@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import os
 import subprocess
@@ -29,8 +31,8 @@ def parse_arguments():
     return parser
 
 
-def read_hosts_from_stdin():
-    if args.verbose:
+def read_hosts_from_stdin(verbose):
+    if verbose:
         print(
             "Reading hosts from stdin. Press Ctrl+D (or Ctrl+Z on Windows) to end input."
         )
@@ -97,7 +99,7 @@ def main():
     elif args.hosts:
         hosts = args.hosts
     else:
-        hosts = read_hosts_from_stdin()
+        hosts = read_hosts_from_stdin(args.verbose)
 
     if not hosts:
         parser.print_help()
