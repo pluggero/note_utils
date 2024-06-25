@@ -8,8 +8,8 @@ from datetime import datetime
 
 import nmap
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 console = Console()
 
@@ -35,6 +35,11 @@ def parse_arguments():
     parser.add_argument("hosts", nargs="*", help="List of hosts")
     parser.add_argument(
         "--verbose", action="store_true", help="Display detailed information"
+    )
+    parser.add_argument(
+        "--md-table",
+        action="store_true",
+        help="Output results in Markdown table format",
     )
     return parser.parse_args()
 
@@ -103,11 +108,11 @@ def perform_sudo_port_scan(hosts, verbose=False):
                     text=True,
                     check=True,
                 )
-                open_ports = []
-                for line in result.stdout.splitlines():
-                    if "/tcp" in line and "open" in line:
-                        port = line.split("/")[0]
-                        open_ports.append(port)
+                open_ports = [
+                    line.split("/")[0]
+                    for line in result.stdout.splitlines()
+                    if "/tcp" in line and "open" in line
+                ]
                 if open_ports:
                     up_hosts.append(host)
             except subprocess.CalledProcessError as e:
@@ -180,15 +185,23 @@ def main():
         f"[bold cyan]Connection Test done: {total_hosts} hosts ({len(up_hosts)} hosts up) scanned in {duration_connection_test:.2f} seconds[/bold cyan]"
     )
 
-    table_lines = ["| Host | Reachable |", "|------|-----------|"]
-
-    for host in hosts:
-        status = "Yes" if host in up_hosts else "No"
-        table_lines.append(f"| {host} | {status} |")
-
-    md_output = "\n".join(table_lines)
-
-    console.print(f"\n{md_output}")
+    if args.md_table:
+        table_lines_md = ["| Host | Reachable |", "|------|-----------|"]
+        for host in hosts:
+            status_md = "Yes" if host in up_hosts else "No"
+            table_lines_md.append(f"| {host} | {status_md} |")
+        md_output = "\n".join(table_lines_md)
+        print(md_output)  # Plain Markdown output for easy copy-pasting
+    else:
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Host", style="dim")
+        table.add_column("Reachable")
+        for host in hosts:
+            status_console = (
+                "[green]Yes[/green]" if host in up_hosts else "[red]No[/red]"
+            )
+            table.add_row(host, status_console)
+        console.print(table)
 
 
 if __name__ == "__main__":
