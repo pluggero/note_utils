@@ -186,6 +186,18 @@ def main():
         f"[bold cyan]Connection Test done: {total_hosts} hosts ({len(up_hosts)} hosts up) scanned in {duration_connection_test:.2f} seconds[/bold cyan]"
     )
 
+    # Show the rendered result table
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Host", style="dim")
+    table.add_column("Reachable")
+    table.add_column("Comment")
+    for host in hosts:
+        status_console = "[green]Yes[/green]" if host in up_hosts else "[red]No[/red]"
+        comment_console = "No ICMP Echo Reply" if host in newly_up_hosts else ""
+        table.add_row(host, status_console, comment_console)
+    console.print(table)
+
+    # Only shows the markdown table if the flag is set
     if args.md_table:
         table_lines_md = [
             "| Host | Reachable | Comment |",
@@ -193,30 +205,10 @@ def main():
         ]
         for host in hosts:
             status_md = "Yes" if host in up_hosts else "No"
-            comment_md = (
-                "Host does not respond to ICMP packets"
-                if host in newly_up_hosts
-                else ""
-            )
+            comment_md = "No ICMP Echo Reply" if host in newly_up_hosts else ""
             table_lines_md.append(f"| {host} | {status_md} | {comment_md} |")
         md_output = "\n".join(table_lines_md)
-        print(md_output)
-    else:
-        table = Table(show_header=True, header_style="bold")
-        table.add_column("Host", style="dim")
-        table.add_column("Reachable")
-        table.add_column("Comment")
-        for host in hosts:
-            status_console = (
-                "[green]Yes[/green]" if host in up_hosts else "[red]No[/red]"
-            )
-            comment_console = (
-                "Host does not respond to ICMP packets"
-                if host in newly_up_hosts
-                else ""
-            )
-            table.add_row(host, status_console, comment_console)
-        console.print(table)
+        print(f"\n{md_output}")
 
 
 if __name__ == "__main__":
