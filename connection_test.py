@@ -6,7 +6,6 @@ import subprocess
 import sys
 from datetime import datetime
 
-import nmap
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
@@ -52,7 +51,7 @@ def read_hosts_from_stdin(verbose):
     return [line.strip() for line in sys.stdin if line.strip()]
 
 
-def perform_ping_sweep(nm, hosts, verbose=False):
+def perform_ping_sweep(hosts, verbose=False):
     up_hosts = []
     down_hosts = []
 
@@ -68,8 +67,12 @@ def perform_ping_sweep(nm, hosts, verbose=False):
             if verbose:
                 console.print(f"Pinging {host}...")
             try:
-                nm.scan(host, arguments="-sn")
-                if nm.all_hosts():
+                result = subprocess.run(
+                    ["sudo", "nmap", "-sn", host],
+                    capture_output=True,
+                    text=True,
+                )
+                if "Host is up" in result.stdout:
                     if verbose:
                         console.print(f"[green]{host} is up.[/green]")
                     up_hosts.append(host)
@@ -86,7 +89,7 @@ def perform_ping_sweep(nm, hosts, verbose=False):
     return up_hosts, down_hosts
 
 
-def perform_sudo_port_scan(hosts, verbose=False):
+def perform_port_scan(hosts, verbose=False):
     up_hosts = []
     with Progress(
         SpinnerColumn(),
@@ -150,8 +153,7 @@ def main():
         f"[bold yellow]Stage 1 - Starting Ping Sweep at {start_time_ping_sweep.strftime('%Y-%m-%d %H:%M')}[/bold yellow]"
     )
 
-    nm = nmap.PortScanner()
-    up_hosts, down_hosts = perform_ping_sweep(nm, hosts, args.verbose)
+    up_hosts, down_hosts = perform_ping_sweep(hosts, args.verbose)
 
     end_time_ping_sweep = datetime.now()
     duration_ping_sweep = (end_time_ping_sweep - start_time_ping_sweep).total_seconds()
@@ -167,7 +169,7 @@ def main():
             f"[bold magenta]Stage 2 - Starting Port Scan on unreachable hosts at {start_time_port_scan.strftime('%Y-%m-%d %H:%M')}[/bold magenta]"
         )
 
-        newly_up_hosts = perform_sudo_port_scan(down_hosts, args.verbose)
+        newly_up_hosts = perform_port_scan(down_hosts, args.verbose)
         up_hosts.extend(newly_up_hosts)
 
         end_time_port_scan = datetime.now()
