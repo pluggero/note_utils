@@ -4,9 +4,14 @@ import sys
 
 
 def create_folders_from_file(file_path, base_path):
-    with open(file_path, "r") as file:
-        hostnames = [line.strip() for line in file.readlines()]
-        create_folders(hostnames, base_path)
+    try:
+        with open(file_path, "r") as file:
+            hostnames = [line.strip() for line in file.readlines()]
+            create_folders(hostnames, base_path)
+    except FileNotFoundError:
+        print(f"Error: File {file_path} not found.")
+    except Exception as e:
+        print(f"Error reading file {file_path}: {e}")
 
 
 def create_folders_from_stdin(base_path):
@@ -27,7 +32,7 @@ def create_folders(hostnames, base_path):
 def main():
     parser = argparse.ArgumentParser(
         description="Create folders for each hostname in a specified path.",
-        usage="%(prog)s [-f FILE] -p PATH\n       cat hostnames.txt | %(prog)s -p PATH",
+        usage="%(prog)s [-f FILE] -p [PATH]\n       cat hostnames.txt | %(prog)s -p [PATH]",
     )
     parser.add_argument(
         "-f",
@@ -36,7 +41,11 @@ def main():
         help="Path to the file containing hostnames or DNS names.",
     )
     parser.add_argument(
-        "-p", "--path", type=str, help="Base path where folders should be created."
+        "-p",
+        "--path",
+        type=str,
+        default=os.getcwd(),
+        help="Base path where folders should be created. Defaults to the current directory.",
     )
 
     args = parser.parse_args()
@@ -45,15 +54,12 @@ def main():
         parser.print_help(sys.stderr)
         sys.exit(1)
 
-    if args.path is None:
-        print("Error: Base path is required.")
-        parser.print_help(sys.stderr)
-        sys.exit(1)
+    base_path = args.path if args.path else os.getcwd()
 
     if args.file:
-        create_folders_from_file(args.file, args.path)
+        create_folders_from_file(args.file, base_path)
     else:
-        create_folders_from_stdin(args.path)
+        create_folders_from_stdin(base_path)
 
 
 if __name__ == "__main__":
