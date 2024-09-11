@@ -25,8 +25,11 @@ def create_folders(hostnames, base_path):
     for hostname in hostnames:
         folder_path = os.path.join(base_path, hostname)
         try:
-            os.makedirs(folder_path, exist_ok=True)
-            print(f"Created folder: {folder_path}")
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path, exist_ok=True)
+                print(f"Created folder: {folder_path}")
+            else:
+                print(f"Folder already exists: {folder_path}")
         except Exception as e:
             print(f"Error creating folder {folder_path}: {e}")
 
