@@ -46,6 +46,11 @@ def parse_arguments():
         action="store_true",
         help="Test web connectivity on ports 80 and 443",
     )
+    parser.add_argument(
+        "--web-ports",
+        type=str,
+        help="Comma-separated list of custom ports to test (e.g., '80,443,8080')",
+    )
     return parser.parse_args()
 
 
@@ -132,7 +137,7 @@ def perform_port_scan(hosts, verbose=False):
     return up_hosts
 
 
-def perform_web_connectivity_test(hosts, verbose=False):
+def perform_web_connectivity_test(hosts, ports=[80, 443], verbose=False):
     web_results = {}
     with Progress(
         SpinnerColumn(),
@@ -144,7 +149,7 @@ def perform_web_connectivity_test(hosts, verbose=False):
 
         for host in hosts:
             web_results[host] = {}
-            for port in [80, 443]:
+            for port in ports:
                 try:
                     if verbose:
                         console.print(f"Testing {host}:{port}...")
@@ -228,16 +233,24 @@ def main():
 
     # Web connectivity test
     web_results = {}
+    web_ports = [80, 443]
     if args.web_test:
+        if args.web_ports:
+            try:
+                web_ports = [int(port.strip()) for port in args.web_ports.split(",")]
+            except ValueError:
+                console.print("[bold red]Error: Invalid port format. Use comma-separated integers (e.g., '80,443,8080')[/bold red]")
+                sys.exit(1)
+        
         start_time_web_test = datetime.now()
         console.print(
             f"[bold green]Stage 3 - Starting Web Connectivity Test at {start_time_web_test.strftime('%Y-%m-%d %H:%M')}[/bold green]"
         )
-        web_results = perform_web_connectivity_test(up_hosts, args.verbose)
+        web_results = perform_web_connectivity_test(up_hosts, web_ports, args.verbose)
         end_time_web_test = datetime.now()
         duration_web_test = (end_time_web_test - start_time_web_test).total_seconds()
         console.print(
-            f"[bold green]Stage 3 - Web Connectivity Test done: {len(up_hosts)} hosts tested in {duration_web_test:.2f} seconds[/bold green]"
+            f"[bold green]Stage 3 - Web Connectivity Test done: {len(up_hosts)} hosts tested on {len(web_ports)} ports in {duration_web_test:.2f} seconds[/bold green]"
         )
 
     console.print(
@@ -250,17 +263,19 @@ def main():
     table.add_column("Reachable")
     table.add_column("Comment")
     if args.web_test:
-        table.add_column("HTTP (80)")
-        table.add_column("HTTPS (443)")
+        for port in web_ports:
+            table.add_column(f"Port {port}")
     
     for host in hosts:
         status_console = "[green]Yes[/green]" if host in up_hosts else "[red]No[/red]"
         comment_console = "No ICMP Echo Reply" if host in newly_up_hosts else ""
         
         if args.web_test:
-            http_status = web_results.get(host, {}).get("80", "N/A") if host in up_hosts else "N/A"
-            https_status = web_results.get(host, {}).get("443", "N/A") if host in up_hosts else "N/A"
-            table.add_row(host, status_console, comment_console, http_status, https_status)
+            row_data = [host, status_console, comment_console]
+            for port in web_ports:
+                port_status = web_results.get(host, {}).get(str(port), "N/A") if host in up_hosts else "N/A"
+                row_data.append(port_status)
+            table.add_row(*row_data)
         else:
             table.add_row(host, status_console, comment_console)
     console.print(table)
@@ -268,16 +283,22 @@ def main():
     # Only shows the markdown table if the flag is set
     if args.md_table:
         if args.web_test:
-            table_lines_md = [
-                "| Host | Reachable | Comment | HTTP (80) | HTTPS (443) |",
-                "|------|-----------|---------|-----------|-------------|",
-            ]
+            # Create dynamic header with port columns
+            port_headers = " | ".join([f"Port {port}" for port in web_ports])
+            header_line = f"| Host | Reachable | Comment | {port_headers} |"
+            separator_line = "|------|-----------|---------|" + "|-----------|" * len(web_ports)
+            
+            table_lines_md = [header_line, separator_line]
+            
             for host in hosts:
                 status_md = "Yes" if host in up_hosts else "No"
                 comment_md = "No ICMP Echo Reply" if host in newly_up_hosts else ""
-                http_status = web_results.get(host, {}).get("80", "N/A") if host in up_hosts else "N/A"
-                https_status = web_results.get(host, {}).get("443", "N/A") if host in up_hosts else "N/A"
-                table_lines_md.append(f"| {host} | {status_md} | {comment_md} | {http_status} | {https_status} |")
+                port_statuses = []
+                for port in web_ports:
+                    port_status = web_results.get(host, {}).get(str(port), "N/A") if host in up_hosts else "N/A"
+                    port_statuses.append(port_status)
+                port_data = " | ".join(port_statuses)
+                table_lines_md.append(f"| {host} | {status_md} | {comment_md} | {port_data} |")
         else:
             table_lines_md = [
                 "| Host | Reachable | Comment |",
