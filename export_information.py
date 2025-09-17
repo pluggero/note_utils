@@ -30,13 +30,13 @@ def get_patterns(info_type):
     """Return the appropriate patterns based on the type of information to extract."""
     return {
         "username": [
-            r"\*\*CREDENTIALS\*\*: `([^:]+):",  # Matches usernames in the CREDENTIALS line
-            r"\*\*HASH\*\*: `([^:]+):",  # Matches usernames in the HASH line
-            r"\*\*USER\*\*: `([^ |^`]+)",  # Matches usernames in the USER line
+            r"\*\*CREDENTIALS\*\*: ```([^:]+):",  # Matches usernames in the CREDENTIALS line
+            r"\*\*HASH\*\*: ```([^:]+):",  # Matches usernames in the HASH line
+            r"\*\*USER\*\*: ```([^ |^`]+)",  # Matches usernames in the USER line
         ],
         "password": [
-            r"\*\*CREDENTIALS\*\*: `[^:]+:([^ |^`]+)",  # Matches passwords in the CREDENTIALS line
-            r"\*\*PASSWORD\*\*: `([^ |^`]+)",  # Matches passwords in the PASSWORD line
+            r"\*\*CREDENTIALS\*\*: ```[^:]+:([^ |^`]+)",  # Matches passwords in the CREDENTIALS line
+            r"\*\*PASSWORD\*\*: ```([^ |^`]+)",  # Matches passwords in the PASSWORD line
         ],
     }[info_type]
 
