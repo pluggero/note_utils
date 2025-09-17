@@ -283,10 +283,15 @@ def main():
     # Only shows the markdown table if the flag is set
     if args.md_table:
         if args.web_test:
+            # Calculate column widths for better alignment
+            max_host_width = max(len("Host"), max(len(host) for host in hosts))
+            max_comment_width = max(len("Comment"), len("No ICMP Echo Reply"))
+            port_width = max(len(f"Port {port}") for port in web_ports) if web_ports else 8
+            
             # Create dynamic header with port columns
-            port_headers = " | ".join([f"Port {port}" for port in web_ports])
-            header_line = f"| Host | Reachable | Comment | {port_headers} |"
-            separator_line = "|------|-----------|---------|" + "|-----------|" * len(web_ports)
+            port_headers = " | ".join([f"Port {port}".center(port_width) for port in web_ports])
+            header_line = f"| {'Host'.ljust(max_host_width)} | {'Reachable'.center(9)} | {'Comment'.ljust(max_comment_width)} | {port_headers} |"
+            separator_line = f"|{'-' * (max_host_width + 2)}|{'-' * 11}|{'-' * (max_comment_width + 2)}|" + f"{'-' * (port_width + 2)}|" * len(web_ports)
             
             table_lines_md = [header_line, separator_line]
             
@@ -296,18 +301,22 @@ def main():
                 port_statuses = []
                 for port in web_ports:
                     port_status = web_results.get(host, {}).get(str(port), "N/A") if host in up_hosts else "N/A"
-                    port_statuses.append(port_status)
+                    port_statuses.append(port_status.center(port_width))
                 port_data = " | ".join(port_statuses)
-                table_lines_md.append(f"| {host} | {status_md} | {comment_md} | {port_data} |")
+                table_lines_md.append(f"| {host.ljust(max_host_width)} | {status_md.center(9)} | {comment_md.ljust(max_comment_width)} | {port_data} |")
         else:
+            # Calculate column widths for basic table
+            max_host_width = max(len("Host"), max(len(host) for host in hosts))
+            max_comment_width = max(len("Comment"), len("No ICMP Echo Reply"))
+            
             table_lines_md = [
-                "| Host | Reachable | Comment |",
-                "|------|-----------|---------|",
+                f"| {'Host'.ljust(max_host_width)} | {'Reachable'.center(9)} | {'Comment'.ljust(max_comment_width)} |",
+                f"|{'-' * (max_host_width + 2)}|{'-' * 11}|{'-' * (max_comment_width + 2)}|",
             ]
             for host in hosts:
                 status_md = "Yes" if host in up_hosts else "No"
                 comment_md = "No ICMP Echo Reply" if host in newly_up_hosts else ""
-                table_lines_md.append(f"| {host} | {status_md} | {comment_md} |")
+                table_lines_md.append(f"| {host.ljust(max_host_width)} | {status_md.center(9)} | {comment_md.ljust(max_comment_width)} |")
         md_output = "\n".join(table_lines_md)
         print(f"\n{md_output}")
 
