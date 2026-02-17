@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import ipaddress
 import os
 import socket
 import subprocess
@@ -52,6 +53,20 @@ def parse_arguments():
         help="Comma-separated list of custom ports to test (e.g., '80,443,8080')",
     )
     return parser.parse_args()
+
+
+def expand_hosts(raw_hosts):
+    expanded = []
+    for entry in raw_hosts:
+        if "/" in entry:
+            try:
+                network = ipaddress.ip_network(entry, strict=False)
+                expanded.extend(str(ip) for ip in network.hosts())
+            except ValueError:
+                expanded.append(entry)
+        else:
+            expanded.append(entry)
+    return expanded
 
 
 def read_hosts_from_stdin(verbose):
@@ -200,6 +215,7 @@ def main():
         console.print("[bold red]No hosts specified.[/bold red]")
         sys.exit(1)
 
+    hosts = expand_hosts(hosts)
     total_hosts = len(hosts)
 
     start_time_connection_test = datetime.now()
