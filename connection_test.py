@@ -79,7 +79,7 @@ def perform_ping_sweep(hosts, verbose=False):
                 console.print(f"Pinging {host}...")
             try:
                 result = subprocess.run(
-                    ["sudo", "nmap", "-sn", host],
+                    ["sudo", "nmap", "-n", "-PE", "-sn", "--max-retries", "0", host],
                     capture_output=True,
                     text=True,
                 )
@@ -122,8 +122,10 @@ def perform_port_scan(hosts, verbose=False):
                         "-n",
                         "-PE",
                         "-sT",
-                        "--max-parallelism 1",
-                        "--max-retries 0",
+                        "--max-parallelism",
+                        "1",
+                        "--max-retries",
+                        "0",
                         "--top-ports",
                         "1000",
                         host,
