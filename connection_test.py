@@ -113,11 +113,21 @@ def perform_port_scan(hosts, verbose=False):
         for host in hosts:
             try:
                 if verbose:
-                    console.print(
-                        f"Scanning top 1000 ports on {host} with sudo nmap -Pn..."
-                    )
+                    console.print(f"Scanning top 1000 ports on {host} with nmap...")
                 result = subprocess.run(
-                    ["sudo", "nmap", "-Pn", "--top-ports", "1000", host],
+                    [
+                        "sudo",
+                        "nmap",
+                        "-Pn",
+                        "-n",
+                        "-PE",
+                        "-sT",
+                        "--max-parallelism 1",
+                        "--max-retries 0",
+                        "--top-ports",
+                        "1000",
+                        host,
+                    ],
                     capture_output=True,
                     text=True,
                     check=True,
@@ -239,9 +249,11 @@ def main():
             try:
                 web_ports = [int(port.strip()) for port in args.web_ports.split(",")]
             except ValueError:
-                console.print("[bold red]Error: Invalid port format. Use comma-separated integers (e.g., '80,443,8080')[/bold red]")
+                console.print(
+                    "[bold red]Error: Invalid port format. Use comma-separated integers (e.g., '80,443,8080')[/bold red]"
+                )
                 sys.exit(1)
-        
+
         start_time_web_test = datetime.now()
         console.print(
             f"[bold green]Stage 3 - Starting Web Connectivity Test at {start_time_web_test.strftime('%Y-%m-%d %H:%M')}[/bold green]"
@@ -265,15 +277,19 @@ def main():
     if args.web_test:
         for port in web_ports:
             table.add_column(f"Port {port}")
-    
+
     for host in hosts:
         status_console = "[green]Yes[/green]" if host in up_hosts else "[red]No[/red]"
         comment_console = "No ICMP Echo Reply" if host in newly_up_hosts else ""
-        
+
         if args.web_test:
             row_data = [host, status_console, comment_console]
             for port in web_ports:
-                port_status = web_results.get(host, {}).get(str(port), "N/A") if host in up_hosts else "N/A"
+                port_status = (
+                    web_results.get(host, {}).get(str(port), "N/A")
+                    if host in up_hosts
+                    else "N/A"
+                )
                 row_data.append(port_status)
             table.add_row(*row_data)
         else:
@@ -286,29 +302,42 @@ def main():
             # Calculate column widths for better alignment
             max_host_width = max(len("Host"), max(len(host) for host in hosts))
             max_comment_width = max(len("Comment"), len("No ICMP Echo Reply"))
-            port_width = max(len(f"Port {port}") for port in web_ports) if web_ports else 8
-            
+            port_width = (
+                max(len(f"Port {port}") for port in web_ports) if web_ports else 8
+            )
+
             # Create dynamic header with port columns
-            port_headers = " | ".join([f"Port {port}".center(port_width) for port in web_ports])
+            port_headers = " | ".join(
+                [f"Port {port}".center(port_width) for port in web_ports]
+            )
             header_line = f"| {'Host'.ljust(max_host_width)} | {'Reachable'.center(9)} | {'Comment'.ljust(max_comment_width)} | {port_headers} |"
-            separator_line = f"|{'-' * (max_host_width + 2)}|{'-' * 11}|{'-' * (max_comment_width + 2)}|" + f"{'-' * (port_width + 2)}|" * len(web_ports)
-            
+            separator_line = (
+                f"|{'-' * (max_host_width + 2)}|{'-' * 11}|{'-' * (max_comment_width + 2)}|"
+                + f"{'-' * (port_width + 2)}|" * len(web_ports)
+            )
+
             table_lines_md = [header_line, separator_line]
-            
+
             for host in hosts:
                 status_md = "Yes" if host in up_hosts else "No"
                 comment_md = "No ICMP Echo Reply" if host in newly_up_hosts else ""
                 port_statuses = []
                 for port in web_ports:
-                    port_status = web_results.get(host, {}).get(str(port), "N/A") if host in up_hosts else "N/A"
+                    port_status = (
+                        web_results.get(host, {}).get(str(port), "N/A")
+                        if host in up_hosts
+                        else "N/A"
+                    )
                     port_statuses.append(port_status.center(port_width))
                 port_data = " | ".join(port_statuses)
-                table_lines_md.append(f"| {host.ljust(max_host_width)} | {status_md.center(9)} | {comment_md.ljust(max_comment_width)} | {port_data} |")
+                table_lines_md.append(
+                    f"| {host.ljust(max_host_width)} | {status_md.center(9)} | {comment_md.ljust(max_comment_width)} | {port_data} |"
+                )
         else:
             # Calculate column widths for basic table
             max_host_width = max(len("Host"), max(len(host) for host in hosts))
             max_comment_width = max(len("Comment"), len("No ICMP Echo Reply"))
-            
+
             table_lines_md = [
                 f"| {'Host'.ljust(max_host_width)} | {'Reachable'.center(9)} | {'Comment'.ljust(max_comment_width)} |",
                 f"|{'-' * (max_host_width + 2)}|{'-' * 11}|{'-' * (max_comment_width + 2)}|",
@@ -316,7 +345,9 @@ def main():
             for host in hosts:
                 status_md = "Yes" if host in up_hosts else "No"
                 comment_md = "No ICMP Echo Reply" if host in newly_up_hosts else ""
-                table_lines_md.append(f"| {host.ljust(max_host_width)} | {status_md.center(9)} | {comment_md.ljust(max_comment_width)} |")
+                table_lines_md.append(
+                    f"| {host.ljust(max_host_width)} | {status_md.center(9)} | {comment_md.ljust(max_comment_width)} |"
+                )
         md_output = "\n".join(table_lines_md)
         print(f"\n{md_output}")
 
