@@ -18,7 +18,7 @@ def extract_information(file_path, patterns, include_domain=False):
                 # If extracting usernames and the --include-domain flag is not set, strip the domain
                 if not include_domain and "\\" in match:
                     match = re.search(domain_pattern, match).group(1)
-                match = match.strip()
+                match = match.strip().lower()
                 # Ensure uniqueness
                 if match not in items:
                     items.append(match)
