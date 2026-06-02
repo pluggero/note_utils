@@ -5,7 +5,7 @@ import os
 import re
 
 
-def extract_information(file_path, patterns, with_domain=False):
+def extract_information(file_path, patterns, include_domain=False):
     """Extract information from the file content based on provided patterns."""
     with open(file_path, "r") as file:
         content = file.read()
@@ -15,8 +15,8 @@ def extract_information(file_path, patterns, with_domain=False):
         for pattern in patterns:
             matches = re.findall(pattern, content)
             for match in matches:
-                # If extracting usernames and the --with-domain flag is not set, strip the domain
-                if not with_domain and "\\" in match:
+                # If extracting usernames and the --include-domain flag is not set, strip the domain
+                if not include_domain and "\\" in match:
                     match = re.search(domain_pattern, match).group(1)
                 match = match.strip()
                 # Ensure uniqueness
@@ -29,7 +29,7 @@ def extract_information(file_path, patterns, with_domain=False):
 def get_patterns(info_type):
     """Return the appropriate patterns based on the type of information to extract."""
     return {
-        "username": [
+        "user": [
             r"\*\*CREDENTIALS\*\*: ```([^:]+):",  # Matches usernames in the CREDENTIALS line
             r"\*\*HASH\*\*: ```([^:]+):",  # Matches usernames in the HASH line
             r"\*\*USER\*\*: ```([^ |^`]+)",  # Matches usernames in the USER line
@@ -37,6 +37,12 @@ def get_patterns(info_type):
         "password": [
             r"\*\*CREDENTIALS\*\*: ```[^:]+:([^ |^`]+)",  # Matches passwords in the CREDENTIALS line
             r"\*\*PASSWORD\*\*: ```([^ |^`]+)",  # Matches passwords in the PASSWORD line
+        ],
+        "hash": [
+            r"\*\*HASH\*\*: ```[^:]+:([^ |^`]+)",  # Matches hashes in the HASH line
+        ],
+        "tgt": [
+            r"\*\*TGT\*\*: ```[^:]+:([^ |^`]+)",  # Matches TGT blobs in the TGT line
         ],
     }[info_type]
 
@@ -48,13 +54,13 @@ def parse_arguments():
     )
     parser.add_argument(
         "type",
-        choices=["username", "password"],
-        help="Type of information to extract (username or password)",
+        choices=["user", "password", "hash", "tgt"],
+        help="Type of information to extract (user, password, hash, or tgt)",
     )
     parser.add_argument(
-        "--with-domain",
+        "--include-domain",
         action="store_true",
-        help="Include domain in the usernames (only applies to username type)",
+        help="Include domain in the usernames (only applies to user type)",
     )
     parser.add_argument(
         "note_path",
@@ -88,12 +94,12 @@ def main():
 
     # Iterate through each file and extract information
     for file_path in sorted(note_files):
-        extracted_items = extract_information(file_path, patterns, args.with_domain)
+        extracted_items = extract_information(file_path, patterns, args.include_domain)
         items.update(extracted_items)
 
-    # Output the unique usernames or passwords, one per line
-    for item in sorted(items):
-        print(item)
+    # Use blank lines between TGT entries for readability; single newline otherwise
+    delimiter = "\n\n" if args.type == "tgt" else "\n"
+    print(delimiter.join(sorted(items)))
 
 
 if __name__ == "__main__":
