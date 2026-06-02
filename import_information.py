@@ -5,7 +5,7 @@ import sys
 
 
 def format_user(item, domain=None):
-    prefix = f"{domain}\\" if domain else ""
+    prefix = f"{domain.lower()}\\" if domain and "\\" not in item else ""
     return f"- **USER**: ```{prefix}{item}```"
 
 
@@ -21,7 +21,7 @@ def get_formatter(info_type):
 
 def read_items(input_file):
     """Read non-blank lines from the input file."""
-    return [line.strip() for line in input_file if line.strip()]
+    return [line.strip().lower() for line in input_file if line.strip()]
 
 
 def parse_arguments():
